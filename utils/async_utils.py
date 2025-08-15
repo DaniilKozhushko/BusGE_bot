@@ -1,5 +1,6 @@
 import json
 import httpx
+import utils.utils as u
 from collections import namedtuple
 from typing import Optional, NamedTuple
 from config import TTC_BUS_API, BASE_TBILISI_URL, BASE_BATUMI_URL
@@ -108,3 +109,34 @@ async def get_batumi_schedule(bus_stop_number: int) -> Optional[list[namedtuple]
                         )
                     break
     return result
+
+
+async def return_schedule(bus_stop_number: int, city: str) -> str:
+    """
+    Returns a formatted schedule for a given stop and city if possible.
+
+    :param bus_stop_number: bus stop number
+    :param city: name of the city selected by the user
+    :return: formatted schedule or information message
+    """
+    # functions by cities
+    schedule_funcs = {
+        "Tbilisi": get_tbilisi_schedule,
+        "Batumi": get_batumi_schedule,
+    }
+
+    # getting schedule depending on user's city
+    schedule = await schedule_funcs[city](bus_stop_number)
+
+    if schedule:
+        parse_funcs = {
+            "Tbilisi": u.parse_tbilisi_schedule,
+            "Batumi": u.parse_batumi_schedule
+        }
+
+        # schedule formatting
+        schedule = parse_funcs[city](schedule)
+
+        return schedule
+    else:
+        return "😢 В ближайшее время автобусов не ожидается или указан неверный номер остановки."

@@ -38,7 +38,7 @@ async def start_command(message: Message):
         # adding a new user to the database
         await db.add_user(user_id)
         await message.answer(
-            text=f"""Приветствую, {message.from_user.first_name}!
+            text=f"""👋🏻 Приветствую, {message.from_user.first_name}!
 
 Чтобы получить расписание автобусов - выбери свой город и введи номер остановки (4 цифры можно узнать, посмотрев на табло, или на Яндекс.Картах)"""
         )
@@ -51,7 +51,7 @@ async def start_command(message: Message):
 @user_router.message(Command("set_city"))
 async def set_city_command(message: Message):
     # offering user to select city
-    await message.answer(text="Выбери свой город:", reply_markup=ikb.set_city())
+    await message.answer(text="🏘 Выбери свой город:", reply_markup=ikb.set_city())
 
 
 # selecting a city
@@ -71,7 +71,7 @@ async def about_command(message: Message):
     await message.answer(
         text="""Чтобы получить расписание автобусов - выбери свой город и введи номер остановки.
     
-Номер можно узнать, посмотрев на табло у остановки - в левом нижнем углу написано <b>ID:XXXX</b>, где XXXX - номер твоей остановки.
+Номер можно узнать в Яндекс.Картах или, посмотрев на табло у остановки - в левом нижнем углу написано <b>ID:XXXX</b>, где XXXX - номер твоей остановки.
 
 Введи номер и получишь расписание автобусов, например:
 <code>17:55</code> 🔴 <code>408</code> через <b>3</b> мин. Rustaveli M/S
@@ -103,33 +103,57 @@ async def user_text(message: Message):
         # getting user's city
         city = await db.get_city_name(user_id)
 
-        # functions by cities
-        schedule_funcs = {
-            "Tbilisi": au.get_tbilisi_schedule,
-            "Batumi": au.get_batumi_schedule,
-        }
-
         # sending action as if the bot is typing
         await message.bot.send_chat_action(chat_id=message.chat.id, action="typing")
 
-        # getting schedule depending on user's city
-        schedule = await schedule_funcs[city](bus_stop_number)
-        if schedule:
-            parse_funcs = {
-                "Tbilisi": u.parse_tbilisi_schedule,
-                "Batumi": u.parse_batumi_schedule
-            }
+        # getting schedule
+        answer = await au.return_schedule(bus_stop_number, city)
 
-            # schedule formatting
-            answer = parse_funcs[city](schedule)
-            await message.answer(text=f"{answer}")
-        else:
-            await message.answer(
-                text="😢 В ближайшее время автобусов не ожидается или указан неверный номер остановки."
-            )
+        # sending a message to a user
+        sent_msg  = await message.answer(text=answer, reply_markup=None)
+        await sent_msg.edit_reply_markup(
+            reply_markup=ikb.refresh_schedule(city, bus_stop_number, sent_msg.chat.id, sent_msg.message_id)
+        )
     else:
         # offering user to select city
         await message.answer(
             text="Выбери, пожалуйста, свой город чтобы получить расписание автобусов.",
             reply_markup=ikb.set_city(),
+        )
+
+
+# "refresh" button
+@user_router.callback_query(F.data.startswith("refr:"))
+async def refresh_schedule(callback: CallbackQuery):
+    # getting callback data
+    callback_data = callback.data.split(":")
+    city = callback_data[1]
+
+    # writing callback data to variables
+    bus_stop_number, chat_id, message_id = map(int, callback_data[2:])
+
+    # getting schedule
+    answer = await au.return_schedule(bus_stop_number, city)
+
+    # if possible to change
+    try:
+        await callback.bot.edit_message_text(
+            text=answer,
+            chat_id=chat_id,
+            message_id=message_id,
+            reply_markup=ikb.refresh_schedule(city, bus_stop_number, chat_id, message_id)
+        )
+        await callback.answer(text=f"Обновлено: {bus_stop_number}")
+    except Exception as e:
+        if "message is not modified" in str(e).lower():
+            if "😢" not in answer:
+                await callback.answer(text=f"Пока изменений в расписании нет: {bus_stop_number}")
+            else:
+                await callback.answer()
+            return
+
+        # sending a message to a user
+        sent_msg = await callback.message.answer(text=answer, reply_markup=None)
+        await sent_msg.edit_reply_markup(
+            reply_markup=ikb.refresh_schedule(city, bus_stop_number, sent_msg.chat.id, sent_msg.message_id)
         )
