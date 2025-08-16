@@ -1,12 +1,24 @@
 import re
 import pytz
-from utils.async_utils import Bus
+from typing import NamedTuple
 from transliterate import translit
 from datetime import datetime, timedelta
 
+# creating a namedtuple class for routes
+class Route(NamedTuple):
+    id: str
+    status: int
+    number: str
+
+# creating a namedtuple class for buses
+class Bus(NamedTuple):
+    number: str
+    will_arrive_in: int
+    route:tuple[str, str]
 
 # setting time zone tbilisi
 tbilisi_tz = pytz.timezone("Asia/Tbilisi")
+
 
 def emoji(arrival_time: int) -> str:
     """
@@ -73,8 +85,9 @@ def parse_batumi_schedule(schedule: list[Bus]) -> str:
         # emoji
         sign = emoji(will_arrive_in)
 
-        start_point, end_point = bus.route[0], bus.route[1]
         # route
+        start_point, end_point = bus.route[0], bus.route[1]
+
         # translation from Georgian to English
         start_point, end_point = translit(start_point, "ka", reversed=True).title(), translit(end_point, "ka", reversed=True).title()
 

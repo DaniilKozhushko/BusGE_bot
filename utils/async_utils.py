@@ -2,27 +2,15 @@ import json
 import httpx
 import utils.utils as u
 from collections import namedtuple
-from typing import Optional, NamedTuple
+from typing import Optional
 from config import TTC_BUS_API, BASE_TBILISI_URL, BASE_BATUMI_URL
 
 
-# creating a namedtuple class for routes
-class Route(NamedTuple):
-    id: str
-    status: int
-    number: str
-
-# creating a namedtuple class for buses
-class Bus(NamedTuple):
-    number: str
-    will_arrive_in: int
-    route:tuple[str, str]
-
-async def get_tbilisi_schedule(bus_stop_number: int) -> Optional[list[dict]]:
+async def get_tbilisi_schedule(stop_id: int) -> Optional[list[dict]]:
     """
     Returns json of bus schedules for a given stop.
 
-    :param bus_stop_number: bus stop number
+    :param stop_id: bus stop number
     :return: list of dicts if the server successfully sent a response, otherwise None
     """
 
@@ -33,7 +21,7 @@ async def get_tbilisi_schedule(bus_stop_number: int) -> Optional[list[dict]]:
         }
         headers = {"X-api-key": TTC_BUS_API}
         response = await client.get(
-            url=BASE_TBILISI_URL.format(bus_stop_number=bus_stop_number),
+            url=BASE_TBILISI_URL.format(bus_stop_number=stop_id),
             headers=headers,
             params=params,
         )
@@ -63,7 +51,7 @@ async def get_batumi_schedule(bus_stop_number: int) -> Optional[list[namedtuple]
             routes = []
             for route_id, route_info in stop_info["routes"].items():
                 routes.append(
-                    Route(
+                    u.Route(
                         id=route_id,
                         status=route_info["Status"],
                         number=data["data"]["routesNames"][route_id]["RouteNameEN"],
@@ -101,7 +89,7 @@ async def get_batumi_schedule(bus_stop_number: int) -> Optional[list[namedtuple]
                             data["data"]["busStops"][end_id]["BusStopNameEN"],
                         )
                         result.append(
-                            Bus(
+                            u.Bus(
                                 number=route.number,
                                 will_arrive_in=will_arrive_in,
                                 route=(start_name, end_name),
@@ -111,12 +99,12 @@ async def get_batumi_schedule(bus_stop_number: int) -> Optional[list[namedtuple]
     return result
 
 
-async def return_schedule(bus_stop_number: int, city: str) -> str:
+async def return_schedule(stop_id: int, city_name: str) -> str:
     """
     Returns a formatted schedule for a given stop and city if possible.
 
-    :param bus_stop_number: bus stop number
-    :param city: name of the city selected by the user
+    :param stop_id: bus stop number
+    :param city_name: name of the city selected by the user
     :return: formatted schedule or information message
     """
     # functions by cities
@@ -126,7 +114,7 @@ async def return_schedule(bus_stop_number: int, city: str) -> str:
     }
 
     # getting schedule depending on user's city
-    schedule = await schedule_funcs[city](bus_stop_number)
+    schedule = await schedule_funcs[city_name](stop_id)
 
     if schedule:
         parse_funcs = {
@@ -135,8 +123,8 @@ async def return_schedule(bus_stop_number: int, city: str) -> str:
         }
 
         # schedule formatting
-        schedule = parse_funcs[city](schedule)
+        schedule = parse_funcs[city_name](schedule)
 
         return schedule
     else:
-        return "😢 В ближайшее время автобусов не ожидается или указан неверный номер остановки."
+        return "😢 Все автобусы уехали и в ближайшее время не ожидается."

@@ -14,6 +14,7 @@ To get started, the user needs to select a city and then enter the stop number. 
 
 ## ⭐️ Features
 The user selects their city (Tbilisi or Batumi), enters the stop number, and then receives the schedule of the nearest buses arriving at that stop.
+Users can also save frequently used stops with custom names for quick access.
 
 ## ⚙️ Technologies
 - `Python` 3.11+
