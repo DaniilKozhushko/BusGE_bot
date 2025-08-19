@@ -55,7 +55,7 @@ async def start_command(message: Message):
 # command /menu handler
 @user_router.message(Command("menu"))
 async def start_command(message: Message):
-    sent_msg = await message.answer(text="Автобусы Грузии 🇬🇪", reply_markup=None)
+    sent_msg = await message.answer(text="Автобусы Грузии 🇬🇪 12345", reply_markup=None)
     await sent_msg.edit_reply_markup(
         reply_markup=ikb.main_menu(sent_msg.chat.id, sent_msg.message_id)
     )
@@ -197,6 +197,9 @@ async def refresh_button(callback: CallbackQuery):
     # writing callback data to variables
     stop_id, chat_id, message_id = map(int, callback_data[2:])
 
+    # sending action as if the bot is typing
+    await callback.message.bot.send_chat_action(chat_id=chat_id, action="typing")
+
     # getting schedule
     answer = await au.return_schedule(stop_id, city_name)
 
@@ -309,12 +312,20 @@ async def saved_stops_button(callback: CallbackQuery):
 
     # writing callback data to variables
     chat_id, message_id, city_id, stop_id = map(int, callback_data[1:])
+    user_id = callback.from_user.id
+
+    # getting bus stop alias
+    stop_alias = await db.get_stop_alias(user_id, city_id, stop_id)
 
     # getting city_name
     city_name = await db.get_city_name(city_id)
 
+    # sending action as if the bot is typing
+    await callback.message.bot.send_chat_action(chat_id=chat_id, action="typing")
+
     # getting schedule
-    answer = await au.return_schedule(stop_id, city_name)
+    answer = f"<b>{stop_alias}:</b>\n"
+    answer += await au.return_schedule(stop_id, city_name)
 
     # if possible to change bot message
     try:
@@ -344,9 +355,17 @@ async def saved_stops_button(callback: CallbackQuery):
 
     # writing callback data to variables
     stop_id, chat_id, message_id = map(int, callback_data[2:])
+    user_id = callback.from_user.id
+
+    # getting bus stop alias
+    stop_alias = await db.get_stop_alias(user_id, city_id, stop_id)
+
+    # sending action as if the bot is typing
+    await callback.message.bot.send_chat_action(chat_id=chat_id, action="typing")
 
     # getting schedule
-    answer = await au.return_schedule(stop_id, city_name)
+    answer = f"{stop_alias}:\n"
+    answer += await au.return_schedule(stop_id, city_name)
 
     city_id = await db.get_city_id(city_name)
 

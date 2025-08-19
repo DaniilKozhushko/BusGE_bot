@@ -298,3 +298,25 @@ async def delete_user_stop(user_id: int, city_id: int, stop_id: int) -> None:
             (user_id, city_id, stop_id)
         )
         await db.commit()
+
+
+async def get_stop_alias(user_id: int, city_id:int, stop_id: int) -> str:
+    """
+    Returns the name of the stop given to it by the user
+
+    :param user_id: the user whose stop name you want to get
+    :param city_id: the id of the city in which this stop is located
+    :param stop_id: bus stop number
+    :return: name of the bus stop
+    """
+
+    async with aiosqlite.connect("BusGE_bot.db") as db:
+        async with db.execute(
+            """
+            SELECT name
+            FROM user_stops
+            WHERE user_id = ? AND city_id = ? AND stop_id = ?
+        """, (user_id, city_id, stop_id)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0]
