@@ -55,7 +55,7 @@ async def start_command(message: Message):
 # command /menu handler
 @user_router.message(Command("menu"))
 async def start_command(message: Message):
-    sent_msg = await message.answer(text="Автобусы Грузии 🇬🇪 12345", reply_markup=None)
+    sent_msg = await message.answer(text="Автобусы Грузии 🇬🇪", reply_markup=None)
     await sent_msg.edit_reply_markup(
         reply_markup=ikb.main_menu(sent_msg.chat.id, sent_msg.message_id)
     )
@@ -364,7 +364,7 @@ async def saved_stops_button(callback: CallbackQuery):
     await callback.message.bot.send_chat_action(chat_id=chat_id, action="typing")
 
     # getting schedule
-    answer = f"{stop_alias}:\n"
+    answer = f"<b>{stop_alias}:</b>\n"
     answer += await au.return_schedule(stop_id, city_name)
 
     city_id = await db.get_city_id(city_name)
