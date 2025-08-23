@@ -1,5 +1,6 @@
 import asyncio
 from aiogram import Bot
+from logger import logger
 from database import init_db
 from aiogram import Dispatcher
 from aiogram.enums import ParseMode
@@ -20,9 +21,11 @@ dp = Dispatcher(storage=MemoryStorage())
 
 # main async function to start the bot
 async def main():
+    logger.info("BOT STARTED")
 
     # initializing the database
     await init_db()
+    logger.info("DATABASE INITIALIZED")
 
     # connecting a router
     dp.include_router(user_router)
@@ -30,12 +33,15 @@ async def main():
     try:
         # clean updates so the bot doesn't process old commands after startup
         await bot.delete_webhook(drop_pending_updates=True)
+        logger.info("WEBHOOK CLEARED")
 
         # start long polling
+        logger.info("POLLING STARTED")
         await dp.start_polling(bot, allowed_updates=dp.resolve_used_update_types())
     finally:
         # correct closing of the session after the bot finishes working
         await bot.session.close()
+        logger.info("BOT STOPPED")
 
 # run
 if __name__ == "__main__":

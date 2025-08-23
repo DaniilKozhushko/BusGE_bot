@@ -87,7 +87,7 @@ async def user_exists(user_id: int) -> bool:
 
 async def city_selected(user_id: int) -> bool:
     """
-    Checks if a user with the given user_id has selected a city
+    Checks if a user with the given user_id has selected a city.
 
     :param user_id: user's id to check
     :return: True if the user has selected, otherwise NO
@@ -157,7 +157,7 @@ async def set_city(user_id: int, city_name: str) -> None:
 
 async def get_user_city_name(user_id: int) -> str:
     """
-    Returns the name of the city selected by the user
+    Returns the name of the city selected by the user.
 
     :param user_id: user id whose city need to get
     :return: user's name of the city
@@ -198,7 +198,7 @@ async def stop_exists(city_name, stop_id):
 
 async def get_users_stops(user_id: int) -> Optional[list[tuple[str, int, int]]]:
     """
-    Returns a list of the user's saved stops as tuples of the form (name, stop_id, city_id)
+    Returns a list of the user's saved stops as tuples of the form (name, stop_id, city_id).
 
     :param user_id: user (by id) whose stops need to be retrieved
     :return: list of stops or empty list
@@ -300,14 +300,14 @@ async def delete_user_stop(user_id: int, city_id: int, stop_id: int) -> None:
         await db.commit()
 
 
-async def get_stop_alias(user_id: int, city_id:int, stop_id: int) -> str:
+async def get_stop_alias(user_id: int, city_id:int, stop_id: int) -> str | None:
     """
-    Returns the name of the stop given to it by the user
+    Returns the name of the stop given to it by the user.
 
     :param user_id: the user whose stop name you want to get
     :param city_id: the id of the city in which this stop is located
     :param stop_id: bus stop number
-    :return: name of the bus stop
+    :return: name of the bus stop< otherwise None
     """
 
     async with aiosqlite.connect("BusGE_bot.db") as db:
@@ -319,4 +319,6 @@ async def get_stop_alias(user_id: int, city_id:int, stop_id: int) -> str:
         """, (user_id, city_id, stop_id)
         ) as cursor:
             row = await cursor.fetchone()
-            return row[0]
+            if row:
+                return row[0]
+            return None
