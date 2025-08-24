@@ -21,22 +21,28 @@ Users can also save frequently used stops with custom names for quick access and
 - `aiosqlite`
 - `httpx`
 - `dotenv`
+- `logging`
 
 ## 🗂 Project Structure
 
 ```
 .
 ├── handlers/ # Bot handlers
+│   ├── admin_router.py # Router with logic and commands for admins
 │   └── user_router.py # Router with logic and commands for users
 ├── images/
 ├── keyboards/ # Keyboards for bot
 │   └── inline.py # Inline-keyboards
+├── middlewares/ # Middlewares for bot
+│   ├── clear_state.py # Clearing States when entering commands
+│   └── only_admin.py # Access to the router only for admins
 ├── utils/ # Different functions
 │   ├── async_utils.py # Asynchronous server request functions
 │   └── utils.py # Schedule parsing functions
 ├── .env # Environment variables
 ├── .gitignore # Files and folders excluded from Git
 ├── batumi_data.json # Main file with routes in Batumi
+├── logger.py # Logging actions in the bot
 ├── config.py # Loading settings from .env via dotenv
 ├── database.py # Working with the database
 ├── main.py # Entry point: bot launch
