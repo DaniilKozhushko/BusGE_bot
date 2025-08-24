@@ -1,5 +1,7 @@
 import aiosqlite
 from typing import Optional
+from datetime import datetime, UTC
+
 
 async def init_db() -> None:
     """
@@ -63,6 +65,20 @@ async def init_db() -> None:
                 PRIMARY KEY (user_id, city_id, stop_id),
                 FOREIGN KEY (user_id) REFERENCES users(id),
                 FOREIGN KEY (city_id, stop_id) REFERENCES city_stops(city_id, stop_id)
+            )
+        """
+        )
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS requests (
+                id INTEGER PRIMARY KEY, 
+                user_id INTEGER NOT NULL,
+                request TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                request_status INTEGER DEFAULT 0,
+                answer TEXT,
+                answer_datetime DATETIME,
+                FOREIGN KEY (user_id) REFERENCES users(id)
             )
         """
         )
@@ -322,3 +338,94 @@ async def get_stop_alias(user_id: int, city_id:int, stop_id: int) -> str | None:
             if row:
                 return row[0]
             return None
+
+
+async def count_requests(user_id: int) -> int:
+    """
+    Returns the number of requests sent by the user in the last 24 hours.
+
+    :param user_id: user's telegram id
+    :return: number of requests
+    """
+
+    async with aiosqlite.connect("BusGE_bot.db") as db:
+        async with db.execute(
+            """
+            SELECT COUNT(*)
+            FROM requests
+            WHERE user_id = ? AND timestamp >= datetime('now', '-1 day') AND request_status = 0
+        """, (user_id,)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0] if row else 0
+
+
+async def add_request(user_id: int, user_request: str) -> int:
+    """
+    Saves user's request into the database and returns its id.
+
+    :param user_id: user's telegram id
+    :param user_request: user's request text
+    :return: id of added request
+    """
+
+    # getting request time
+    now = datetime.now(UTC).isoformat()
+
+    async with aiosqlite.connect("BusGE_bot.db") as db:
+        cursor = await db.execute(
+            """
+            INSERT INTO requests (user_id, request, timestamp)
+            VALUES (?, ?, ?)
+        """, (user_id, user_request, now)
+        )
+        await db.commit()
+
+        request_id = cursor.lastrowid
+        return request_id
+
+
+async def add_answer(answer_text: str, request_id: int):
+    """
+    Adds the admin's response to the user's request to the database.
+
+    :param answer_text: admin response text
+    :param request_id: user request id
+    :return:
+    """
+
+    # getting answer time
+    now = datetime.now(UTC).isoformat()
+
+    async with aiosqlite.connect("BusGE_bot.db") as db:
+        await db.execute(
+            """
+            UPDATE requests
+            SET request_status = 1,
+                answer = ?,
+                answer_datetime = ?
+            WHERE id = ?
+        """, (answer_text, now, request_id)
+        )
+        await db.commit()
+
+
+async def get_user_request(user_id: int, request_id: int) -> str:
+    """
+    Returns the text of the user's request.
+
+    :param user_id: user's telegram id
+    :param request_id: user request id
+    :return: request text
+    """
+
+    async with aiosqlite.connect("BusGE_bot.db") as db:
+        async with db.execute(
+            """
+            SELECT request
+            FROM requests
+            WHERE user_id = ? AND id = ?
+        """, (user_id, request_id)
+        ) as cursor:
+            row = await cursor.fetchone()
+            return row[0]

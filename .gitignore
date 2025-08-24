@@ -12,3 +12,6 @@ BusGE_bot.db
 *.iws
 *.pyo
 *.pyd
+bot.json.log
+*.log
+logs/

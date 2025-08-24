@@ -99,3 +99,17 @@ def delete_stop(city_id: int, stop_id: int, chat_id: int, message_id: int) -> In
         InlineKeyboardButton(text="🗑 Удалить остановку", callback_data=f"del:{city_id}:{stop_id}")
     )
     return builder.as_markup()
+
+
+def cancel_request():
+    """
+    Inline-keyboard for canceling the request.
+
+    :return: InlineKeyboardMarkup
+    """
+
+    builder = InlineKeyboardBuilder()
+    builder.row(
+        InlineKeyboardButton(text="Отменить запрос", callback_data=f"cancel_request")
+    )
+    return builder.as_markup()

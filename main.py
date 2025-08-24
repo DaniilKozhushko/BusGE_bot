@@ -6,8 +6,11 @@ from aiogram import Dispatcher
 from aiogram.enums import ParseMode
 from config import TELEGRAM_BOT_TOKEN
 from handlers.user_router import user_router
+from handlers.admin_router import admin_router
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.client.default import DefaultBotProperties
+from middlewares.clear_state import AutoClearStateMiddleware
+
 
 # initialization of the Bot object with a token and indicating the formation of messages
 bot = Bot(
@@ -28,7 +31,11 @@ async def main():
     logger.info("DATABASE INITIALIZED")
 
     # connecting a router
+    dp.include_router(admin_router)
     dp.include_router(user_router)
+
+    # connecting middleware
+    dp.message.middleware(AutoClearStateMiddleware())
 
     try:
         # clean updates so the bot doesn't process old commands after startup

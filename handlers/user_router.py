@@ -1,12 +1,14 @@
 import database as db
 import utils.async_utils as au
 import keyboards.inline as ikb
+from config import ADMIN
 from logger import logger
 from asyncio import sleep
 from aiogram import Router, F
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
-
+from aiogram.fsm.state import State, StatesGroup
 
 # router for processing messages from users
 user_router = Router()
@@ -20,7 +22,7 @@ async def start_command(message: Message):
 
     logger.info("command start",
                 extra={"user_id": user_id}
-    )
+                )
 
     # checking if a user are in the database
     if await db.user_exists(user_id):
@@ -59,10 +61,10 @@ async def start_command(message: Message):
 
 # command /menu handler
 @user_router.message(Command("menu"))
-async def start_command(message: Message):
+async def menu_command(message: Message):
     logger.info("command menu",
                 extra={"user_id": message.from_user.id}
-    )
+                )
 
     sent_msg = await message.answer(text="Автобусы Грузии 🇬🇪", reply_markup=None)
     await sent_msg.edit_reply_markup(
@@ -75,7 +77,7 @@ async def start_command(message: Message):
 async def set_city_command(message: Message):
     logger.info("button set_city",
                 extra={"user_id": message.from_user.id}
-    )
+                )
 
     # offering user to select a city
     await message.answer(text="🏘 Выбери свой город:", reply_markup=ikb.set_city())
@@ -86,7 +88,7 @@ async def set_city_command(message: Message):
 async def select_city_button(callback: CallbackQuery):
     logger.info("button select_city",
                 extra={"user_id": callback.from_user.id, "city_name": callback.data}
-    )
+                )
 
     await callback.answer(text=f"Выбран город {callback.data}")
 
@@ -102,11 +104,11 @@ async def select_city_button(callback: CallbackQuery):
 async def about_command(message: Message):
     logger.info("command about",
                 extra={"user_id": message.from_user.id}
-    )
+                )
 
     await message.answer(
         text="""Чтобы получить расписание автобусов - выбери свой город и введи номер остановки.
-    
+
 Номер можно узнать в Яндекс.Картах или, посмотрев на табло у остановки - в левом нижнем углу написано <b>ID:XXXX</b>, где XXXX - номер твоей остановки.
 
 Введи номер и получишь расписание автобусов, например:
@@ -123,8 +125,82 @@ async def about_command(message: Message):
 
 Чтобы обновить название остановки - введи её номер и новое название.
 
-Сохранённые маршруты и остановки можно посмотреть по команде /menu"""
+Сохранённые маршруты и остановки можно посмотреть по команде /menu
+
+Если есть вопрос/замечание/предложение, то запрос можно оставить по команде /admin"""
     )
+
+
+class ContactWithAdmin(StatesGroup):
+    making_request = State()
+
+
+# command /admin handler
+@user_router.message(Command("admin"))
+async def admin_command(message: Message, state: FSMContext):
+    logger.info("command admin",
+                extra={"user_id": message.from_user.id}
+                )
+
+    # check the number of requests for the last 24 hours (limit - 5 requests)
+    amount_requests = await db.count_requests(message.from_user.id)
+
+    if amount_requests >= 5:
+        await message.answer(
+            text="""У тебя было довольно много запросов за последние 24 часа, на которые админ ещё не ответил.
+
+Давай подождём немного ❤️"""
+        )
+        await menu_command(message)
+    else:
+        await message.answer(
+            text="""Если у тебя есть вопрос/замечание/предложение, введи его и в ближайшее время админ пришлёт ответ.
+
+Для отмены обращения нажми, пожалуйста, соответствующую кнопку ниже ⬇️""",
+            reply_markup=ikb.cancel_request(),
+        )
+        await state.set_state(ContactWithAdmin.making_request)
+
+
+# cancel request from user
+@user_router.callback_query(F.data == "cancel_request")
+async def cancel_request_button(callback: CallbackQuery, state: FSMContext):
+    logger.info("button cancel_request",
+                extra={"user_id": callback.from_user.id}
+                )
+
+    if await state.get_state() != ContactWithAdmin.making_request:
+        await callback.answer(text="У тебя нет активного запроса.")
+        return
+    else:
+        await state.clear()
+        await callback.answer(text="Запрос отменён.")
+        await menu_command(callback.message)
+
+
+# receiving a request from a user
+@user_router.message(ContactWithAdmin.making_request)
+async def making_request_state(message: Message, state: FSMContext):
+    user_id = message.from_user.id
+    logger.info("text",
+                extra={"user_id": message.from_user.id, "text": message.text}
+                )
+    # saving user text
+    request = message.text.strip()
+
+    # adding a request to the database
+    request_id = await db.add_request(user_id, request)
+
+    # sending request to admin
+    await message.bot.send_message(
+        chat_id=ADMIN,
+        text=f"🆕 НОВЫЙ ЗАПРОС 🆕\n\nUSER_ID: <code>{user_id}</code>\nREQUEST_ID: <code>{request_id}</code>\n\n{request}\n\n/answer [user_id] [request_id] [answer]"
+    )
+
+    # reply to user and end State
+    await message.reply(text="Твой запрос получен. ❤️ Пожалуйста, ожидай.")
+    await state.clear()
+    await menu_command(message)
 
 
 # any user's message
@@ -134,7 +210,7 @@ async def user_text(message: Message):
 
     logger.info("text",
                 extra={"user_id": message.from_user.id, "text": message.text}
-    )
+                )
 
     # check if the city is selected by the user
     if await db.city_selected(user_id):
@@ -202,7 +278,7 @@ async def user_text(message: Message):
         answer = await au.return_schedule(stop_id, city_name, user_id)
 
         # sending a message to a user
-        sent_msg  = await message.answer(text=answer, reply_markup=None)
+        sent_msg = await message.answer(text=answer, reply_markup=None)
         await sent_msg.edit_reply_markup(
             reply_markup=ikb.refresh_schedule(
                 city_name=city_name,
@@ -225,7 +301,7 @@ async def refresh_button(callback: CallbackQuery):
     user_id = callback.from_user.id
     logger.info("button refresh",
                 extra={"user_id": user_id}
-    )
+                )
 
     # getting callback data
     callback_data = callback.data.split(":")
@@ -272,7 +348,7 @@ async def refresh_button(callback: CallbackQuery):
 async def menu_button(callback: CallbackQuery):
     logger.info("button menu",
                 extra={"user_id": callback.from_user.id}
-    )
+                )
 
     # getting callback data
     callback_data = callback.data.split(":")
@@ -305,7 +381,7 @@ async def menu_button(callback: CallbackQuery):
 async def saved_routes_button(callback: CallbackQuery):
     logger.info("button saved_routes",
                 extra={"user_id": callback.from_user.id}
-    )
+                )
 
     await callback.answer(text="*в разработке*")
 
@@ -315,7 +391,7 @@ async def saved_routes_button(callback: CallbackQuery):
 async def saved_stops_button(callback: CallbackQuery):
     logger.info("button saved_stops",
                 extra={"user_id": callback.from_user.id}
-    )
+                )
 
     # getting callback data
     callback_data = callback.data.split(":")
@@ -364,7 +440,7 @@ async def user_stop_button(callback: CallbackQuery):
 
     logger.info("button user_stop",
                 extra={"user_id": user_id}
-    )
+                )
 
     # getting bus stop alias
     stop_alias = await db.get_stop_alias(user_id, city_id, stop_id)
@@ -415,7 +491,7 @@ async def refresh_delete_stop_button(callback: CallbackQuery):
     user_id = callback.from_user.id
     logger.info("button refresh_delete_stop",
                 extra={"user_id": user_id}
-    )
+                )
 
     # getting bus stop alias
     stop_alias = await db.get_stop_alias(user_id, city_id, stop_id)
@@ -455,8 +531,8 @@ async def refresh_delete_stop_button(callback: CallbackQuery):
 @user_router.callback_query(F.data.startswith("del:"))
 async def delete_stop_button(callback: CallbackQuery):
     logger.info("button delete_stop",
-                extra={"user_id":callback.from_user.id}
-    )
+                extra={"user_id": callback.from_user.id}
+                )
 
     # getting callback data
     callback_data = callback.data.split(":")
@@ -472,7 +548,7 @@ async def delete_stop_button(callback: CallbackQuery):
 async def if_saved_stops_button(callback: CallbackQuery):
     logger.info("button if_saved_stops",
                 extra={"user_id": callback.from_user.id}
-    )
+                )
 
     # getting callback data
     callback_data = callback.data.split(":")
